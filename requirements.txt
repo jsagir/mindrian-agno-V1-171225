@@ -30,3 +30,6 @@ tenacity>=8.0.0  # Retry logic
 
 # Database ORM (required by agno.db.sqlite)
 sqlalchemy>=2.0.0
+
+# Research Tools
+tavily-python>=0.3.0

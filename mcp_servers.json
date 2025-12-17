@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schema/mcp-config.json",
+  "mcpServers": {
+    "neo4j": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/mcp-neo4j"
+      ],
+      "env": {
+        "NEO4J_URI": "${NEO4J_URI}",
+        "NEO4J_USER": "${NEO4J_USER}",
+        "NEO4J_PASSWORD": "${NEO4J_PASSWORD}"
+      },
+      "description": "Knowledge graph for framework selection, relationships, and insights",
+      "tools": [
+        "read_neo4j_cypher",
+        "write_neo4j_cypher",
+        "get_neo4j_schema"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/mcp-supabase"
+      ],
+      "env": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_SERVICE_KEY": "${SUPABASE_SERVICE_KEY}"
+      },
+      "description": "PostgreSQL + pgvector for conversation memory and vector search",
+      "tools": [
+        "query",
+        "insert",
+        "update",
+        "delete",
+        "rpc"
+      ]
+    }
+  }
+}

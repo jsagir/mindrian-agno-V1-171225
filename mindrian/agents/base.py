@@ -15,8 +15,15 @@ from abc import ABC, abstractmethod
 
 from agno.agent import Agent
 from agno.models.anthropic import Claude
-from agno.models.google import Gemini
 from agno.tools import Toolkit
+
+# Optional Gemini import - only needed if using Google models
+try:
+    from agno.models.google import Gemini
+    GEMINI_AVAILABLE = True
+except ImportError:
+    Gemini = None
+    GEMINI_AVAILABLE = False
 
 from ..registry.skill_loader import SkillDefinition, SkillType
 from ..registry.mcp_manager import MCPManager, mcp_manager

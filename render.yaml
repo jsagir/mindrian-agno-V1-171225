@@ -1,0 +1,31 @@
+# Render Blueprint - Infrastructure as Code
+# Deploy to Render by connecting this repo
+
+services:
+  - type: web
+    name: mindrian-api
+    runtime: python
+    region: oregon  # Free tier region
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ENVIRONMENT
+        value: production
+      # These should be set in Render dashboard (secrets)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true

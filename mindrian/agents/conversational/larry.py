@@ -388,3 +388,26 @@ known frameworks.
             "recommended_frameworks": s.recommended_frameworks,
             "ready_for_output": self.should_transition_to_output(),
         }
+
+
+def create_larry_agent(
+    mode: LarryMode = LarryMode.CLARIFY,
+    pws_brain_enabled: bool = False,
+) -> Agent:
+    """
+    Factory function to create a Larry agent instance.
+
+    This is a convenience function for creating Larry with sensible defaults.
+
+    Args:
+        mode: Initial conversation mode (default: CLARIFY)
+        pws_brain_enabled: Enable PWS brain vector search (default: False for simpler setup)
+
+    Returns:
+        Agno Agent instance configured as Larry
+    """
+    larry = LarryAgent(
+        mode=mode,
+        pws_brain_enabled=pws_brain_enabled,
+    )
+    return larry.build()

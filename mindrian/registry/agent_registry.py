@@ -193,7 +193,6 @@ class AgentRegistry:
             model=model,
             instructions=instructions,
             tools=tools,
-            show_tool_calls=True,
             markdown=True,
         )
 

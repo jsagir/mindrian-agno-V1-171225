@@ -144,7 +144,6 @@ class MindrianAgent(ABC):
             model=Claude(id=self.model_id),
             instructions=self.get_instructions(),
             tools=self.build_tools(),
-            show_tool_calls=True,
             markdown=True,
         )
 

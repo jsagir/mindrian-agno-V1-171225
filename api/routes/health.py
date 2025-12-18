@@ -47,6 +47,21 @@ async def detailed_health():
         "status": "configured" if pinecone_key else "not_configured"
     }
 
+    # Check Supabase (PWS Brain)
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    health_status["services"]["supabase_pws"] = {
+        "configured": bool(supabase_url and supabase_key),
+        "status": "configured" if (supabase_url and supabase_key) else "not_configured"
+    }
+
+    # Check Google API (for embeddings)
+    google_key = os.getenv("GOOGLE_API_KEY")
+    health_status["services"]["google_embeddings"] = {
+        "configured": bool(google_key),
+        "status": "configured" if google_key else "not_configured"
+    }
+
     # Check Anthropic
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     health_status["services"]["anthropic"] = {

@@ -15,12 +15,16 @@ from pydantic import BaseModel
 
 from mindrian.agents.conversational.larry import create_larry_agent
 from mindrian.teams.deep_research_team import DeepResearchTeam
+from mindrian.tools.pws_brain import PWSBrainTools
 
 router = APIRouter()
 
 
 # In-memory session storage (replace with Redis/DB in production)
 sessions: Dict[str, Dict[str, Any]] = {}
+
+# PWS Brain instance for knowledge retrieval
+pws_brain = PWSBrainTools()
 
 
 class ChatMessage(BaseModel):
@@ -136,13 +140,23 @@ async def chat(request: ChatRequest):
     ])
 
     try:
-        # Create Larry agent
-        larry = create_larry_agent()
+        # Create Larry agent with PWS brain enabled
+        larry = create_larry_agent(pws_brain_enabled=True)
 
-        # Run Larry with the conversation
-        response = larry.run(
-            f"Conversation so far:\n{history}\n\nUser's latest message: {request.message}"
-        )
+        # Retrieve relevant PWS context for the user's message
+        pws_context = ""
+        try:
+            pws_context = await pws_brain.get_pws_perspective(request.message, top_k=3)
+        except Exception as e:
+            print(f"PWS brain retrieval error: {e}")
+
+        # Build the prompt with knowledge context
+        prompt = f"Conversation so far:\n{history}\n\nUser's latest message: {request.message}"
+        if pws_context:
+            prompt = f"{prompt}\n\n{pws_context}"
+
+        # Run Larry with the conversation + knowledge context
+        response = larry.run(prompt)
 
         # Extract response content
         response_text = response.content if hasattr(response, 'content') else str(response)

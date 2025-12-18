@@ -62,6 +62,13 @@ async def detailed_health():
         "status": "configured" if google_key else "not_configured"
     }
 
+    # Check SerpAPI (for patent search)
+    serpapi_key = os.getenv("SERPAPI_API_KEY")
+    health_status["services"]["serpapi_patents"] = {
+        "configured": bool(serpapi_key),
+        "status": "configured" if serpapi_key else "not_configured"
+    }
+
     # Check Anthropic
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     health_status["services"]["anthropic"] = {

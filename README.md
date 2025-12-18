@@ -17,11 +17,13 @@ Mindrian is a cognitive orchestration platform that helps users explore, validat
 │                    MINDRIAN ARCHITECTURE                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Frontend (Agno Agent UI + Syncfusion)                          │
-│  └── Vercel (FREE)                                              │
+│  Frontend (Next.js + shadcn/ui + Syncfusion)                    │
+│  └── Repo: github.com/jsagir/mindrian-ui                        │
+│  └── Host: Vercel (FREE)                                        │
 │                                                                  │
-│  Backend (FastAPI + Agno AgentOS)                               │
-│  └── Render (FREE)                                              │
+│  Backend (FastAPI + Agno Framework) ← THIS REPO                 │
+│  └── Host: Render (FREE)                                        │
+│  └── URL: https://mindrian-api.onrender.com                     │
 │                                                                  │
 │  Databases                                                       │
 │  ├── Neo4j Aura (Knowledge Graph) - FREE tier                   │
@@ -29,6 +31,8 @@ Mindrian is a cognitive orchestration platform that helps users explore, validat
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+> **Note**: The UI is in a separate repository: [mindrian-ui](https://github.com/jsagir/mindrian-ui)
 
 ## Project Structure
 

@@ -95,7 +95,7 @@ class GooglePatentsTools:
             "engine": "google_patents",
             "q": full_query,
             "api_key": self.api_key,
-            "num": min(num_results, 100),
+            "num": max(10, min(num_results, 100)),  # SerpAPI requires min 10, max 100
         }
 
         if status:

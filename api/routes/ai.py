@@ -424,3 +424,205 @@ Return ONLY valid JSON, nothing else."""
 
     # Fallback to local insights
     return ChartInsightsResponse(insights=generate_local_insights(request.opportunities))
+
+
+# ----- Patent Search Models -----
+
+class PatentSearchRequest(BaseModel):
+    query: str
+    num_results: int = 10
+    inventor: Optional[str] = None
+    assignee: Optional[str] = None
+    country: Optional[str] = None
+
+
+class PatentResult(BaseModel):
+    patent_id: str
+    title: str
+    snippet: str
+    inventor: Optional[str] = None
+    assignee: Optional[str] = None
+    publication_date: Optional[str] = None
+    url: Optional[str] = None
+    relevance: str = "0%"
+
+
+class PatentSearchResponse(BaseModel):
+    results: List[PatentResult]
+    total_found: int
+
+
+class IPLandscapeRequest(BaseModel):
+    problem_description: str
+    key_features: List[str] = []
+
+
+class IPLandscapeResponse(BaseModel):
+    query_keywords: List[str]
+    total_found: int
+    top_patents: List[Dict[str, Any]]
+    ip_density: str
+    recommendations: List[str]
+    risk_level: Optional[str] = None
+
+
+# ----- Patent Search Endpoints -----
+
+# Import patent tools
+try:
+    from mindrian.tools.google_patents import GooglePatentsTools
+    patent_tools = GooglePatentsTools()
+except ImportError:
+    patent_tools = None
+
+
+@router.post("/ai/search-patents", response_model=PatentSearchResponse)
+async def search_patents(request: PatentSearchRequest):
+    """
+    Search Google Patents for relevant prior art and IP.
+
+    Uses SerpAPI to search the patent database.
+    """
+    if not patent_tools:
+        raise HTTPException(status_code=503, detail="Patent search not available")
+
+    try:
+        results = await patent_tools.search_patents(
+            query=request.query,
+            num_results=request.num_results,
+            inventor=request.inventor,
+            assignee=request.assignee,
+            country=request.country,
+        )
+
+        return PatentSearchResponse(
+            results=[
+                PatentResult(
+                    patent_id=r.patent_id,
+                    title=r.title,
+                    snippet=r.snippet,
+                    inventor=r.inventor,
+                    assignee=r.assignee,
+                    publication_date=r.publication_date,
+                    url=r.url,
+                    relevance=f"{r.relevance_score:.0%}",
+                )
+                for r in results
+            ],
+            total_found=len(results),
+        )
+    except Exception as e:
+        print(f"Patent search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ai/ip-landscape", response_model=IPLandscapeResponse)
+async def analyze_ip_landscape(request: IPLandscapeRequest):
+    """
+    Analyze the IP landscape for a problem/innovation.
+
+    Searches for relevant patents and provides strategic analysis.
+    """
+    if not patent_tools:
+        raise HTTPException(status_code=503, detail="Patent search not available")
+
+    try:
+        analysis = await patent_tools.analyze_ip_landscape(
+            problem_description=request.problem_description,
+            top_k=5,
+        )
+
+        # If key features provided, also check prior art
+        if request.key_features:
+            prior_art = await patent_tools.check_prior_art(
+                innovation_description=request.problem_description,
+                key_features=request.key_features,
+            )
+            analysis["risk_level"] = prior_art["risk_level"]
+            analysis["recommendations"].insert(0, prior_art["recommendation"])
+
+        return IPLandscapeResponse(**analysis)
+    except Exception as e:
+        print(f"IP landscape error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ai/check-context-patents")
+async def check_context_patents(request: Dict[str, Any]):
+    """
+    Context-aware patent check.
+
+    Analyzes conversation context to identify relevant IP and patents.
+    Uses AI to extract key innovation aspects and search for prior art.
+    """
+    context = request.get("context", "")
+
+    if not context:
+        raise HTTPException(status_code=400, detail="Context is required")
+
+    client = get_anthropic_client()
+
+    # Use AI to extract innovation aspects
+    innovation_aspects = {
+        "problem": "",
+        "solution_approach": "",
+        "key_features": [],
+        "technical_domain": "",
+    }
+
+    if client:
+        try:
+            response = client.messages.create(
+                model="claude-3-5-haiku-20241022",
+                max_tokens=500,
+                messages=[{
+                    "role": "user",
+                    "content": f"""Analyze this conversation and extract key aspects for patent search:
+
+---
+{context}
+---
+
+Return a JSON object with:
+- problem: The core problem being solved (1-2 sentences)
+- solution_approach: The proposed solution approach (1-2 sentences)
+- key_features: Array of 3-5 key differentiating features
+- technical_domain: The technical field (e.g., "machine learning", "IoT", "healthcare")
+- search_queries: Array of 2-3 patent search queries to find prior art
+
+Return ONLY valid JSON, nothing else."""
+                }]
+            )
+
+            import json
+            innovation_aspects = json.loads(response.content[0].text.strip())
+        except Exception as e:
+            print(f"Context extraction error: {e}")
+
+    # If patent tools available, search for prior art
+    patent_results = []
+    if patent_tools and innovation_aspects.get("search_queries"):
+        for query in innovation_aspects["search_queries"][:2]:
+            try:
+                results = await patent_tools.search_patents(query, num_results=3)
+                patent_results.extend([
+                    {
+                        "id": r.patent_id,
+                        "title": r.title,
+                        "snippet": r.snippet,
+                        "relevance": f"{r.relevance_score:.0%}",
+                    }
+                    for r in results
+                ])
+            except Exception:
+                pass
+
+    return {
+        "innovation_aspects": innovation_aspects,
+        "related_patents": patent_results[:5],  # Top 5 unique
+        "recommendation": (
+            "Found potentially related patents - recommend detailed IP analysis"
+            if patent_results
+            else "No immediate prior art found - consider filing provisional patent"
+        ),
+    }

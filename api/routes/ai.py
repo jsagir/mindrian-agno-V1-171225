@@ -468,12 +468,19 @@ class IPLandscapeResponse(BaseModel):
 
 # ----- Patent Search Endpoints -----
 
-# Import patent tools
+# Import patent tools class (instantiated per-request for fresh env vars)
 try:
     from mindrian.tools.google_patents import GooglePatentsTools
-    patent_tools = GooglePatentsTools()
+    HAS_PATENT_TOOLS = True
 except ImportError:
-    patent_tools = None
+    HAS_PATENT_TOOLS = False
+
+
+def get_patent_tools():
+    """Get a fresh patent tools instance with current env vars"""
+    if not HAS_PATENT_TOOLS:
+        return None
+    return GooglePatentsTools()
 
 
 @router.post("/ai/search-patents", response_model=PatentSearchResponse)
@@ -483,6 +490,7 @@ async def search_patents(request: PatentSearchRequest):
 
     Uses SerpAPI to search the patent database.
     """
+    patent_tools = get_patent_tools()
     if not patent_tools:
         raise HTTPException(status_code=503, detail="Patent search not available")
 
@@ -523,6 +531,7 @@ async def analyze_ip_landscape(request: IPLandscapeRequest):
 
     Searches for relevant patents and provides strategic analysis.
     """
+    patent_tools = get_patent_tools()
     if not patent_tools:
         raise HTTPException(status_code=503, detail="Patent search not available")
 
@@ -601,6 +610,7 @@ Return ONLY valid JSON, nothing else."""
 
     # If patent tools available, search for prior art
     patent_results = []
+    patent_tools = get_patent_tools()
     if patent_tools and innovation_aspects.get("search_queries"):
         for query in innovation_aspects["search_queries"][:2]:
             try:

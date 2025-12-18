@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from api.routes.chat import router as chat_router
 from api.routes.opportunities import router as opportunities_router
 from api.routes.health import router as health_router
+from api.routes.ai import router as ai_router
 
 
 @asynccontextmanager
@@ -62,6 +63,7 @@ app.add_middleware(
 app.include_router(health_router, tags=["Health"])
 app.include_router(chat_router, prefix="/api/v1", tags=["Chat"])
 app.include_router(opportunities_router, prefix="/api/v1", tags=["Opportunities"])
+app.include_router(ai_router, prefix="/api/v1", tags=["AI"])
 
 
 @app.get("/")
@@ -75,6 +77,7 @@ async def root():
         "endpoints": {
             "chat": "/api/v1/chat",
             "opportunities": "/api/v1/opportunities",
+            "ai": "/api/v1/ai",
             "health": "/health",
         }
     }

@@ -9,15 +9,26 @@ import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Import routers
-from api.routes.chat import router as chat_router
-from api.routes.opportunities import router as opportunities_router
-from api.routes.health import router as health_router
-from api.routes.ai import router as ai_router
+# Import routers from routes package (handles legacy import errors)
+from api.routes import (
+    chat_v4_router,
+    health_router,
+    chat_router,
+    opportunities_router,
+    ai_router,
+    LEGACY_AVAILABLE as LEGACY_ROUTES_AVAILABLE,
+)
+
+if not LEGACY_ROUTES_AVAILABLE:
+    print("Warning: Legacy routes not available (agno not installed). Running with v4 routes only.")
 
 
 @asynccontextmanager
@@ -61,9 +72,13 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router, tags=["Health"])
-app.include_router(chat_router, prefix="/api/v1", tags=["Chat"])
-app.include_router(opportunities_router, prefix="/api/v1", tags=["Opportunities"])
-app.include_router(ai_router, prefix="/api/v1", tags=["AI"])
+app.include_router(chat_v4_router, prefix="/api/v2", tags=["Chat v4 (Action-Oriented)"])  # New!
+
+# Include legacy routers if available
+if LEGACY_ROUTES_AVAILABLE:
+    app.include_router(chat_router, prefix="/api/v1", tags=["Chat (Legacy)"])
+    app.include_router(opportunities_router, prefix="/api/v1", tags=["Opportunities"])
+    app.include_router(ai_router, prefix="/api/v1", tags=["AI"])
 
 
 @app.get("/")
@@ -71,14 +86,22 @@ async def root():
     """Root endpoint - API info."""
     return {
         "name": "Mindrian API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "running",
         "docs": "/docs",
         "endpoints": {
-            "chat": "/api/v1/chat",
-            "opportunities": "/api/v1/opportunities",
-            "ai": "/api/v1/ai",
+            # v2 - Action-oriented with role switching (RECOMMENDED)
+            "chat": "/api/v2/chat",
+            "switch_role": "/api/v2/chat/{session_id}/switch-role",
+            "roles": "/api/v2/roles",
+            "sessions": "/api/v2/sessions/{session_id}",
+            "opportunities": "/api/v2/opportunities",
+            "create_opportunity": "/api/v2/opportunities/create-from-session",
+            "deep_dive": "/api/v2/opportunities/{id}/deep-dive",
+            # System
             "health": "/health",
+            # Legacy (v1) - may not be available without agno
+            "chat_legacy": "/api/v1/chat",
         }
     }
 

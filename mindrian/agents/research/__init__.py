@@ -9,6 +9,7 @@ Agents:
     - DomainAnalysisAgent: Maps domains and intersections
     - CSIOAgent: Cross-sectional innovation opportunities
     - GeminiDeepResearchAgent: Autonomous multi-step web research (Google API)
+    - ReverseSalientAgent: Cross-domain innovation via dual similarity analysis
 """
 
 from .beautiful_question import BeautifulQuestionAgent, BEAUTIFUL_QUESTION_INSTRUCTIONS
@@ -19,6 +20,11 @@ from .gemini_deep_research import (
     DeepResearchConfig,
     deep_research,
     register_with_handoff_manager,
+)
+from .reverse_salient import (
+    ReverseSalientAgent,
+    REVERSE_SALIENT_INSTRUCTIONS,
+    create_reverse_salient_agent,
 )
 
 __all__ = [
@@ -36,4 +42,8 @@ __all__ = [
     "DeepResearchConfig",
     "deep_research",
     "register_with_handoff_manager",
+    # Reverse Salient Discovery
+    "ReverseSalientAgent",
+    "REVERSE_SALIENT_INSTRUCTIONS",
+    "create_reverse_salient_agent",
 ]

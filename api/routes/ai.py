@@ -556,6 +556,186 @@ async def analyze_ip_landscape(request: IPLandscapeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ----- PWS Brain Endpoints -----
+
+class PWSSearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    namespace: str = ""  # "" or "pws-materials"
+
+
+class PWSChunkResult(BaseModel):
+    id: str
+    title: str
+    content: str
+    category: str
+    score: float
+
+
+class PWSSearchResponse(BaseModel):
+    results: List[PWSChunkResult]
+    total: int
+    query: str
+
+
+class PWSContextRequest(BaseModel):
+    query: str
+    top_k: int = 3
+
+
+class PWSContextResponse(BaseModel):
+    context: str
+    chunks_used: int
+
+
+# Import PWS Brain
+try:
+    from mindrian.tools.pws_brain_pinecone import PWSBrainPinecone
+    HAS_PWS_BRAIN = True
+except ImportError:
+    HAS_PWS_BRAIN = False
+
+
+@router.get("/ai/pws-brain/status")
+async def pws_brain_status():
+    """Get PWS Brain status and statistics."""
+    if not HAS_PWS_BRAIN:
+        return {"status": "not_available", "error": "PWS Brain module not found"}
+
+    brain = PWSBrainPinecone()
+    stats = await brain.get_stats()
+    return stats
+
+
+@router.post("/ai/pws-brain/search", response_model=PWSSearchResponse)
+async def pws_brain_search(request: PWSSearchRequest):
+    """
+    Search the PWS knowledge base.
+
+    This searches Larry's Personal Wisdom System for relevant
+    frameworks, methodologies, and structured thinking approaches.
+    """
+    if not HAS_PWS_BRAIN:
+        raise HTTPException(status_code=503, detail="PWS Brain not available")
+
+    brain = PWSBrainPinecone()
+
+    try:
+        if request.namespace:
+            results = await brain.search(
+                request.query,
+                top_k=request.top_k,
+                namespace=request.namespace,
+            )
+        else:
+            results = await brain.search_all_namespaces(
+                request.query,
+                top_k=request.top_k,
+            )
+
+        return PWSSearchResponse(
+            results=[
+                PWSChunkResult(
+                    id=r.id,
+                    title=r.title,
+                    content=r.content,
+                    category=r.category,
+                    score=r.score,
+                )
+                for r in results
+            ],
+            total=len(results),
+            query=request.query,
+        )
+    except Exception as e:
+        print(f"PWS Brain search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ai/pws-brain/context", response_model=PWSContextResponse)
+async def pws_brain_context(request: PWSContextRequest):
+    """
+    Get formatted PWS context for a query.
+
+    Returns a formatted context block ready for LLM consumption.
+    This is what Larry uses to enhance his responses with PWS knowledge.
+    """
+    if not HAS_PWS_BRAIN:
+        raise HTTPException(status_code=503, detail="PWS Brain not available")
+
+    brain = PWSBrainPinecone()
+
+    try:
+        context = await brain.get_pws_context(request.query, top_k=request.top_k)
+        chunks_used = context.count("**[") if context else 0
+
+        return PWSContextResponse(
+            context=context,
+            chunks_used=chunks_used,
+        )
+    except Exception as e:
+        print(f"PWS Brain context error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ai/pws-brain/framework/{framework_name}")
+async def get_framework_info(framework_name: str):
+    """Get specific framework information from PWS Brain."""
+    if not HAS_PWS_BRAIN:
+        raise HTTPException(status_code=503, detail="PWS Brain not available")
+
+    brain = PWSBrainPinecone()
+
+    try:
+        chunk = await brain.get_framework_info(framework_name)
+        if not chunk:
+            raise HTTPException(status_code=404, detail=f"Framework '{framework_name}' not found")
+
+        return {
+            "id": chunk.id,
+            "title": chunk.title,
+            "content": chunk.content,
+            "category": chunk.category,
+            "score": chunk.score,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Framework info error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ai/pws-brain/problem-guidance/{problem_type}")
+async def get_problem_guidance(problem_type: str):
+    """
+    Get guidance for a specific problem type.
+
+    Args:
+        problem_type: One of "un-defined", "ill-defined", "well-defined"
+    """
+    if not HAS_PWS_BRAIN:
+        raise HTTPException(status_code=503, detail="PWS Brain not available")
+
+    valid_types = ["un-defined", "ill-defined", "well-defined"]
+    if problem_type.lower() not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid problem type. Must be one of: {valid_types}"
+        )
+
+    brain = PWSBrainPinecone()
+
+    try:
+        guidance = await brain.get_problem_type_guidance(problem_type)
+        return {
+            "problem_type": problem_type,
+            "guidance": guidance,
+        }
+    except Exception as e:
+        print(f"Problem guidance error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/ai/check-context-patents")
 async def check_context_patents(request: Dict[str, Any]):
     """

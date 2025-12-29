@@ -2,6 +2,12 @@
 Chat Routes
 
 Handles conversation with Mindrian agents (Larry, frameworks, etc.)
+
+This uses the high-grade Larry implementation with:
+- Neo4j-validated system prompt
+- PWS methodology integration
+- Problem classification (Un-defined, Ill-defined, Well-defined)
+- Tool triggering based on clarity thresholds
 """
 
 import os
@@ -13,9 +19,13 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from mindrian.agents.conversational.larry import create_larry_agent
+from mindrian.agents.conversational.larry import (
+    create_larry_agent,
+    get_tool_trigger_conditions,
+    should_trigger_tool,
+)
 from mindrian.teams.deep_research_team import DeepResearchTeam
-from mindrian.tools.pws_brain import PWSBrainTools
+from mindrian.tools.pws_brain_pinecone import PWSBrainPinecone
 
 router = APIRouter()
 
@@ -23,8 +33,8 @@ router = APIRouter()
 # In-memory session storage (replace with Redis/DB in production)
 sessions: Dict[str, Dict[str, Any]] = {}
 
-# PWS Brain instance for knowledge retrieval
-pws_brain = PWSBrainTools()
+# PWS Brain instance for knowledge retrieval (Pinecone-based, no Neo4j needed)
+pws_brain = PWSBrainPinecone()
 
 
 class ChatMessage(BaseModel):
@@ -143,10 +153,10 @@ async def chat(request: ChatRequest):
         # Create Larry agent with PWS brain enabled
         larry = create_larry_agent(pws_brain_enabled=True)
 
-        # Retrieve relevant PWS context for the user's message
+        # Retrieve relevant PWS context for the user's message (Pinecone RAG)
         pws_context = ""
         try:
-            pws_context = await pws_brain.get_pws_perspective(request.message, top_k=3)
+            pws_context = await pws_brain.get_pws_context(request.message, top_k=3)
         except Exception as e:
             print(f"PWS brain retrieval error: {e}")
 
@@ -169,17 +179,46 @@ async def chat(request: ChatRequest):
         )
         session["messages"].append(assistant_message)
 
-        # Determine suggested actions based on clarity
+        # Determine suggested actions based on clarity and tool triggering logic
         suggested_actions = []
         clarity = session["clarity"]
         overall = (clarity["what"] + clarity["who"] + clarity["success"]) / 3
+        problem_type = session.get("problem_type", None)
 
-        if overall >= 0.6:
-            suggested_actions = [
-                "Run Minto Pyramid analysis",
-                "Explore with Beautiful Questions",
-                "Start Domain Analysis",
-            ]
+        # Use tool triggering logic to suggest actions
+        if should_trigger_tool(
+            "pws_validation", overall, problem_type,
+            has_what=clarity["what"] > 0.5,
+            has_who=clarity["who"] > 0.5,
+            has_success=clarity["success"] > 0.5,
+        ):
+            suggested_actions.append("Run PWS Validation (GO/PIVOT/NO-GO)")
+
+        if should_trigger_tool("jobs_to_be_done", overall, problem_type):
+            suggested_actions.append("Map Jobs to Be Done")
+
+        if should_trigger_tool("minto_pyramid", overall, problem_type):
+            suggested_actions.append("Structure with Minto Pyramid (SCQA)")
+
+        if should_trigger_tool("devil_advocate", overall, problem_type):
+            suggested_actions.append("Stress-test with Devil's Advocate")
+
+        if should_trigger_tool("beautiful_question", overall, problem_type):
+            suggested_actions.append("Explore with Beautiful Questions")
+
+        if should_trigger_tool("trending_to_absurd", overall, problem_type):
+            suggested_actions.append("Extrapolate with Trending to Absurd")
+
+        if should_trigger_tool("scenario_analysis", overall, problem_type):
+            suggested_actions.append("Run Scenario Analysis")
+
+        # Add team suggestions for high clarity
+        if should_trigger_tool("validation_team", overall, problem_type,
+            has_what=clarity["what"] > 0.5,
+            has_who=clarity["who"] > 0.5,
+            has_success=clarity["success"] > 0.5,
+        ):
+            suggested_actions.insert(0, "Run Full Validation Team (PWS → Devil → JTBD)")
 
         return ChatResponse(
             session_id=session_id,
